@@ -60,3 +60,8 @@ function getPatternType(pattern){
 }
 
 export default domSearchReplace;
+
+/*
+git remote add origin https://github.com/hollowdoor/dom_search_replace.git
+git push -u origin master
+*/
