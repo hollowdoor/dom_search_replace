@@ -1,6 +1,6 @@
 {
   "name": "dom-search-replace",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Search, and replace in DOM nodes",
   "main": "dist/bundle.js",
   "jsnext:main": "dist/bundle.es.js",
