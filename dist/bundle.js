@@ -3,7 +3,6 @@
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var domSearch = _interopDefault(require('dom-search'));
-var isRegexp = _interopDefault(require('is-regexp'));
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
   return typeof obj;
@@ -11,9 +10,47 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
   return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj;
 };
 
+var slicedToArray = function () {
+  function sliceIterator(arr, i) {
+    var _arr = [];
+    var _n = true;
+    var _d = false;
+    var _e = undefined;
+
+    try {
+      for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
+        _arr.push(_s.value);
+
+        if (i && _arr.length === i) break;
+      }
+    } catch (err) {
+      _d = true;
+      _e = err;
+    } finally {
+      try {
+        if (!_n && _i["return"]) _i["return"]();
+      } finally {
+        if (_d) throw _e;
+      }
+    }
+
+    return _arr;
+  }
+
+  return function (arr, i) {
+    if (Array.isArray(arr)) {
+      return arr;
+    } else if (Symbol.iterator in Object(arr)) {
+      return sliceIterator(arr, i);
+    } else {
+      throw new TypeError("Invalid attempt to destructure non-iterable instance");
+    }
+  };
+}();
+
 function domSearchReplace(doc, pattern, replacement, options) {
     var search = (typeof options === 'undefined' ? 'undefined' : _typeof(options)) === 'object' ? Object.create(options) : {};
-    search.type = getPatternType(pattern);
+    search.all = typeof search.all === 'boolean' ? search.all : false;
 
     var result = domSearch(doc, pattern, options);
 
@@ -21,48 +58,27 @@ function domSearchReplace(doc, pattern, replacement, options) {
         return doc;
     }
 
-    if (result.length === 1) {
-        replaceNode(result[0], pattern, replacement, search);
-    } else {
-        replaceNodes(result, pattern, replacement, search);
+    if (isNode(replacement)) {
+        replaceWithNode(result[0], pattern, replacement, search);
+        return doc;
     }
 
-    return doc;
-}
+    replacement = String(replacement);
 
-function replaceNode(result, pattern, replacement, search) {
-    var str = result.textNode.nodeValue;
-
-    if (search.type === 'string') {
-        var start = str.indexOf(pattern);
-        var end = start + pattern.length;
-        var before = str.slice(0, start);
-        var after = str.slice(end, str.length);
-
-        if (typeof replacement === 'string') {
-            result.textNode.nodeValue = before + replacement + after;
-        } else {
-            var frag = document.createDocumentFragment();
-            frag.appendChild(document.createTextNode(before));
-            frag.appendChild(replacement);
-            frag.appendChild(document.createTextNode(after));
-            result.parent.replaceChild(frag, result.textNode);
-        }
-    } else if (search.type === 'regexp') {
-        result.textNode.nodeValue = str.replace(pattern, replacement);
+    if (!search.all) {
+        replaceWithText(result[0], pattern, replacement, search);
+        return doc;
     }
-}
 
-function replaceNodes(result, pattern, replacement, search) {
     var _iteratorNormalCompletion = true;
     var _didIteratorError = false;
     var _iteratorError = undefined;
 
     try {
         for (var _iterator = result[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var info = _step.value;
+            var res = _step.value;
 
-            replaceNode(info, pattern, replacement, search);
+            replaceWithText(res, pattern, replacement, search);
         }
     } catch (err) {
         _didIteratorError = true;
@@ -78,14 +94,53 @@ function replaceNodes(result, pattern, replacement, search) {
             }
         }
     }
+
+    return doc;
 }
 
-function getPatternType(pattern) {
-    if (isRegexp(pattern)) {
-        return 'regexp';
+function replaceWithText(result, pattern, replacement, search) {
+    var str = result.textNode.nodeValue;
+    var parts = void 0,
+        collect = '';
+
+    if (search.all) {
+        parts = str.split(pattern);
+    } else {
+        parts = str.split(pattern, 2);
     }
 
-    return typeof pattern === 'undefined' ? 'undefined' : _typeof(pattern);
+    for (var i = 0; i < parts.length; i++) {
+        collect += parts[i];
+        if (i < parts.length - 1) {
+            collect += replacement;
+        }
+    }
+
+    result.textNode.nodeValue = collect;
+}
+
+function replaceWithNode(result, pattern, replacement, search) {
+    var str = result.textNode.nodeValue;
+
+    var _str$split = str.split(pattern, 2);
+
+    var _str$split2 = slicedToArray(_str$split, 2);
+
+    var before = _str$split2[0];
+    var after = _str$split2[1];
+
+
+    var frag = document.createDocumentFragment();
+
+    frag.appendChild(document.createTextNode(before));
+    frag.appendChild(replacement);
+    frag.appendChild(document.createTextNode(after));
+
+    result.parent.replaceChild(frag, result.textNode);
+}
+
+function isNode(o) {
+    return (typeof Node === 'undefined' ? 'undefined' : _typeof(Node)) === "object" ? o instanceof Node : o && (typeof o === 'undefined' ? 'undefined' : _typeof(o)) === "object" && typeof o.nodeType === "number" && typeof o.nodeName === "string";
 }
 
 module.exports = domSearchReplace;

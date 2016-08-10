@@ -40,6 +40,8 @@ Set if all occurrences of the pattern should be matched.
 
 The default is `false` which means the pattern will only be matched once.
 
+If the `replacement` value is a DOM node then `options.all` does nothing as nodes just get moved around when they are appended.
+
 About
 -----
 

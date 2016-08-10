@@ -1,10 +1,8 @@
 import domSearch from 'dom-search';
-import isRegexp from 'is-regexp';
-
 
 function domSearchReplace(doc, pattern, replacement, options){
     const search = typeof options === 'object' ?  Object.create(options) : {};
-    search.type = getPatternType(pattern);
+    search.all = typeof search.all === 'boolean' ? search.all : false;
 
     let result = domSearch(doc, pattern, options);
 
@@ -12,52 +10,69 @@ function domSearchReplace(doc, pattern, replacement, options){
         return doc;
     }
 
-    if(result.length === 1){
-        replaceNode(result[0], pattern, replacement, search);
-    }else{
-        replaceNodes(result, pattern, replacement, search);
+    if(isNode(replacement)){
+        replaceWithNode(result[0], pattern, replacement, search);
+        return doc;
+    }
+
+    replacement = String(replacement);
+
+    if(!search.all){
+        replaceWithText(result[0], pattern, replacement, search);
+        return doc;
+    }
+
+    for(let res of result){
+        replaceWithText(res, pattern, replacement, search);
     }
 
     return doc;
 }
 
-function replaceNode(result, pattern, replacement, search){
+
+
+function replaceWithText(result, pattern, replacement, search){
+    let str = result.textNode.nodeValue;
+    let parts, collect = '';
+
+    if(search.all){
+        parts = str.split(pattern);
+    }else{
+        parts = str.split(pattern, 2);
+    }
+
+    for(let i=0; i<parts.length; i++){
+        collect += parts[i];
+        if(i < parts.length - 1){
+            collect += replacement;
+        }
+    }
+
+    result.textNode.nodeValue = collect;
+}
+
+function replaceWithNode(result, pattern, replacement, search){
     let str = result.textNode.nodeValue;
 
-    if(search.type === 'string'){
-        let start = str.indexOf(pattern);
-        let end = start + pattern.length;
-        let before = str.slice(0, start);
-        let after = str.slice(end, str.length);
+    let [before, after] = str.split(pattern, 2);
 
-        if(typeof replacement === 'string'){
-            result.textNode.nodeValue = before + replacement + after;
-        }else{
-            const frag = document.createDocumentFragment();
-            frag.appendChild(document.createTextNode(before));
-            frag.appendChild(replacement);
-            frag.appendChild(document.createTextNode(after));
-            result.parent.replaceChild(frag, result.textNode);
-        }
+    const frag = document.createDocumentFragment();
 
-    }else if(search.type === 'regexp'){
-        result.textNode.nodeValue = str.replace(pattern, replacement);
-    }
+    frag.appendChild(document.createTextNode(before));
+    frag.appendChild(replacement);
+    frag.appendChild(document.createTextNode(after));
+
+    result.parent.replaceChild(frag, result.textNode);
+
 }
 
-function replaceNodes(result, pattern, replacement, search){
-    for(let info of result){
-        replaceNode(info, pattern, replacement, search);
-    }
+function isNode(o){
+  return (
+    typeof Node === "object" ? o instanceof Node :
+    o && typeof o === "object" && typeof o.nodeType === "number" && typeof o.nodeName==="string"
+  );
 }
 
-function getPatternType(pattern){
-    if(isRegexp(pattern)){
-        return 'regexp';
-    }
-
-    return typeof pattern;
-}
 
 export default domSearchReplace;
 
