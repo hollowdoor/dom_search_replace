@@ -1,8 +1,10 @@
 import domSearch from 'dom-search';
+import isRegexp from 'is-regexp';
 
 function domSearchReplace(doc, pattern, replacement, options){
     const search = typeof options === 'object' ?  Object.create(options) : {};
     search.all = typeof search.all === 'boolean' ? search.all : false;
+    search.replaceType = getReplacementType(replacement);
 
     let result = domSearch(doc, pattern, options);
 
@@ -10,8 +12,11 @@ function domSearchReplace(doc, pattern, replacement, options){
         return doc;
     }
 
-    if(isNode(replacement)){
+    if(search.replaceType === 'node'){
         replaceWithNode(result[0], pattern, replacement, search);
+        return doc;
+    }else if(search.replaceType === 'appendTo'){
+        replaceWithAppendTo(result[0], pattern, replacement, search);
         return doc;
     }
 
@@ -35,6 +40,11 @@ function replaceWithText(result, pattern, replacement, search){
     let str = result.textNode.nodeValue;
     let parts, collect = '';
 
+    if(sameLength(pattern, str)){
+        result.textNode.nodeValue = replacement;
+        return;
+    }
+
     if(search.all){
         parts = str.split(pattern);
     }else{
@@ -54,6 +64,12 @@ function replaceWithText(result, pattern, replacement, search){
 function replaceWithNode(result, pattern, replacement, search){
     let str = result.textNode.nodeValue;
 
+
+    if(sameLength(pattern, str)){
+        result.parent.replaceChild(replacement, result.textNode);
+        return;
+    }
+
     let [before, after] = str.split(pattern, 2);
 
     const frag = document.createDocumentFragment();
@@ -64,6 +80,46 @@ function replaceWithNode(result, pattern, replacement, search){
 
     result.parent.replaceChild(frag, result.textNode);
 
+}
+
+function replaceWithAppendTo(result, pattern, replacement, search){
+    let str = result.textNode.nodeValue;
+    let frag = document.createDocumentFragment();
+
+    if(sameLength(pattern, str)){
+        replacement.appendTo(frag);
+    }else{
+        let [before, after] = str.split(pattern, 2);
+
+        frag.appendChild(document.createTextNode(before));
+        replacement.appendTo(frag);
+        frag.appendChild(document.createTextNode(after));
+    }
+
+    result.parent.replaceChild(frag, result.textNode);
+
+}
+
+function getReplacementType(replacement){
+    if(isNode(replacement)){
+        return 'node';
+    }else if(typeof replacement === 'object' && typeof replacement.appendTo === 'function'){
+        return 'appendTo';
+    }
+    return 'none';
+}
+
+function sameLength(pattern, str){
+    if(typeof pattern === 'string' && pattern.length === str.length){
+        return true;
+    }else if(isRegexp(pattern)){
+        let match = str.match(pattern);
+        if(match[0].length === str.length){
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function isNode(o){

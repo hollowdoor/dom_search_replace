@@ -3,6 +3,7 @@
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var domSearch = _interopDefault(require('dom-search'));
+var isRegexp = _interopDefault(require('is-regexp'));
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
   return typeof obj;
@@ -51,6 +52,7 @@ var slicedToArray = function () {
 function domSearchReplace(doc, pattern, replacement, options) {
     var search = (typeof options === 'undefined' ? 'undefined' : _typeof(options)) === 'object' ? Object.create(options) : {};
     search.all = typeof search.all === 'boolean' ? search.all : false;
+    search.replaceType = getReplacementType(replacement);
 
     var result = domSearch(doc, pattern, options);
 
@@ -58,8 +60,11 @@ function domSearchReplace(doc, pattern, replacement, options) {
         return doc;
     }
 
-    if (isNode(replacement)) {
+    if (search.replaceType === 'node') {
         replaceWithNode(result[0], pattern, replacement, search);
+        return doc;
+    } else if (search.replaceType === 'appendTo') {
+        replaceWithAppendTo(result[0], pattern, replacement, search);
         return doc;
     }
 
@@ -103,6 +108,11 @@ function replaceWithText(result, pattern, replacement, search) {
     var parts = void 0,
         collect = '';
 
+    if (sameLength(pattern, str)) {
+        result.textNode.nodeValue = replacement;
+        return;
+    }
+
     if (search.all) {
         parts = str.split(pattern);
     } else {
@@ -122,6 +132,11 @@ function replaceWithText(result, pattern, replacement, search) {
 function replaceWithNode(result, pattern, replacement, search) {
     var str = result.textNode.nodeValue;
 
+    if (sameLength(pattern, str)) {
+        result.parent.replaceChild(replacement, result.textNode);
+        return;
+    }
+
     var _str$split = str.split(pattern, 2);
 
     var _str$split2 = slicedToArray(_str$split, 2);
@@ -137,6 +152,51 @@ function replaceWithNode(result, pattern, replacement, search) {
     frag.appendChild(document.createTextNode(after));
 
     result.parent.replaceChild(frag, result.textNode);
+}
+
+function replaceWithAppendTo(result, pattern, replacement, search) {
+    var str = result.textNode.nodeValue;
+    var frag = document.createDocumentFragment();
+
+    if (sameLength(pattern, str)) {
+        replacement.appendTo(frag);
+    } else {
+        var _str$split3 = str.split(pattern, 2);
+
+        var _str$split4 = slicedToArray(_str$split3, 2);
+
+        var before = _str$split4[0];
+        var after = _str$split4[1];
+
+
+        frag.appendChild(document.createTextNode(before));
+        replacement.appendTo(frag);
+        frag.appendChild(document.createTextNode(after));
+    }
+
+    result.parent.replaceChild(frag, result.textNode);
+}
+
+function getReplacementType(replacement) {
+    if (isNode(replacement)) {
+        return 'node';
+    } else if ((typeof replacement === 'undefined' ? 'undefined' : _typeof(replacement)) === 'object' && typeof replacement.appendTo === 'function') {
+        return 'appendTo';
+    }
+    return 'none';
+}
+
+function sameLength(pattern, str) {
+    if (typeof pattern === 'string' && pattern.length === str.length) {
+        return true;
+    } else if (isRegexp(pattern)) {
+        var match = str.match(pattern);
+        if (match[0].length === str.length) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function isNode(o) {
